@@ -1,0 +1,24 @@
+# USC Evidence Collector - Velociraptor offline collector
+OS: Windows
+Artifacts:
+  Generic.Client.Info: {}
+  Windows.System.TaskScheduler: {}
+  Windows.System.Services: {}
+  Windows.Sys.StartupItems: {}
+Target: ZIP
+TargetArgs: {}
+EncryptionScheme: None
+EncryptionArgs: {}
+OptVerbose: true
+OptBanner: false
+OptPrompt: false
+OptAdmin: true
+OptLevel: 5
+OptConcurrency: 2
+OptFormat: jsonl
+OptFilenameTemplate: "Collection-%Hostname%-%TIMESTAMP%"
+OptCollectorTemplate: "Collector_Windows_persistence"
+OptCpuLimit: 50
+OptProgressTimeout: 1800
+OptTimeout: 3600
+OptDeleteAtExit: true

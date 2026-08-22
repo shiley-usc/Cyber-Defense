@@ -1,0 +1,25 @@
+# USC DFIR Evidence Collection - Velociraptor offline collector
+# Generated/managed from this source specification.
+OS: MacOS
+Artifacts:
+  Generic.Client.Info: {}
+  Generic.Forensic.SQLiteHunter: {}
+Target: ZIP
+TargetArgs: {}
+EncryptionScheme: None
+EncryptionArgs: {}
+OptVerbose: true
+OptBanner: false
+OptPrompt: false
+OptAdmin: true
+OptTempdir: ""
+OptLevel: 5
+OptConcurrency: 2
+OptFormat: jsonl
+OptOutputDirectory: ""
+OptFilenameTemplate: "Collection-%Hostname%-%TIMESTAMP%"
+OptCollectorTemplate: "Collector_MacOS_browser"
+OptCpuLimit: 50
+OptProgressTimeout: 1800
+OptTimeout: 3600
+OptDeleteAtExit: true

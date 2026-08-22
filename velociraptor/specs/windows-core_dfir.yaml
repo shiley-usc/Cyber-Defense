@@ -1,0 +1,26 @@
+# USC Evidence Collector - Velociraptor offline collector
+OS: Windows
+Artifacts:
+  Generic.Client.Info: {}
+  Windows.EventLogs.Evtx: {}
+  Windows.Forensics.Prefetch: {}
+  Windows.Forensics.Lnk: {}
+  Windows.System.TaskScheduler: {}
+  Windows.System.Services: {}
+Target: ZIP
+TargetArgs: {}
+EncryptionScheme: None
+EncryptionArgs: {}
+OptVerbose: true
+OptBanner: false
+OptPrompt: false
+OptAdmin: true
+OptLevel: 5
+OptConcurrency: 2
+OptFormat: jsonl
+OptFilenameTemplate: "Collection-%Hostname%-%TIMESTAMP%"
+OptCollectorTemplate: "Collector_Windows_core_dfir"
+OptCpuLimit: 50
+OptProgressTimeout: 1800
+OptTimeout: 3600
+OptDeleteAtExit: true

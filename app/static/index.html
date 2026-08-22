@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#990000">
+<title>DFIR Evidence Collection Console</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<section id="authScreen" class="auth-screen" aria-labelledby="loginTitle">
+  <div class="auth-card">
+    <div class="usc-mark"><span class="usc-wordmark">USC</span><span class="usc-office">Office of Cybersecurity</span></div>
+    <div class="kicker">Security Operations Console</div>
+    <h1 id="loginTitle">Sign in</h1>
+    <p class="auth-copy">Authenticate to access the workspaces assigned to your account.</p>
+    <form id="loginForm" class="auth-form" autocomplete="on">
+      <label>Username<input id="loginUsername" name="username" class="text-input" required autocomplete="username"></label>
+      <label>Password<input id="loginPassword" name="password" class="text-input" type="password" required autocomplete="current-password"></label>
+      <div id="loginError" class="auth-error" role="alert"></div>
+      <button id="loginSubmit" class="btn btn-primary auth-submit" type="submit">Sign in</button>
+    </form>
+    <p class="auth-boundary">Cloudflare Access remains the external authentication boundary when configured.</p>
+  </div>
+</section>
+<div class="app-wrap auth-locked" id="appShell">
+  <header class="banner">
+    <div class="brand-block">
+      <div class="usc-mark"><span class="usc-wordmark">USC</span><span class="usc-office">Office of Cybersecurity</span></div>
+      <div class="kicker" id="pageKicker">Digital Forensics & Incident Response · Evidence Collection</div>
+      <h1 id="pageTitle">DFIR Evidence Collection Console</h1>
+      <p class="tagline" id="pageTagline">Collect approved forensic evidence from authorized endpoints, verify its integrity, and protect it for investigation.</p>
+      <div class="gold-rule" aria-hidden="true"></div>
+    </div>
+    <div class="header-actions">
+      <div class="health-cluster" aria-label="EDR connectivity status">
+        <div class="health-item"><span id="csDot" class="health-dot red"></span><span class="health-name">CrowdStrike</span><span id="csText">Not checked</span></div>
+        <div class="health-item"><span id="s1Dot" class="health-dot red"></span><span class="health-name">SentinelOne</span><span id="s1Text">Not checked</span></div>
+      </div>
+      <span class="source-chip" id="authUserLabel">Signed out</span><button class="btn btn-secondary" id="logoutBtn" type="button">Sign out</button><button class="btn btn-primary" id="refresh" type="button">Refresh status</button>
+    </div>
+  </header>
+
+  <div class="workspace-header-row">
+    <div class="workspace-switcher seg-control" role="tablist" aria-label="Primary workspaces">
+      <button class="seg workspace-tab active" type="button" data-workspace="dfir" role="tab" aria-selected="true" onclick="openWorkspace('dfir')">DFIR Evidence Collection</button>
+      <button class="seg workspace-tab" type="button" data-workspace="assets" role="tab" aria-selected="false" onclick="openWorkspace('assets')">Asset Coverage</button>
+      <button class="seg workspace-tab" type="button" data-workspace="vuln" role="tab" aria-selected="false" onclick="openWorkspace('vuln')">Vulnerability Management</button>
+    </div>
+    <button class="seg persistent-settings" id="settingsGlobal" type="button" aria-label="Settings" onclick="openSettings(); return false;">Settings</button>
+  </div>
+
+  <div class="seg-control dfir-context" id="dfirContextNav" role="group" aria-label="Collection sections">
+    <button class="seg context-link active" type="button" data-view="console" aria-current="page" onclick="openDfirView('console')">Collection</button>
+    <button class="seg context-link" type="button" data-view="jobs" onclick="openDfirView('jobs')">Jobs <span id="navJobsCount"></span></button>
+    <button class="seg context-link" type="button" data-view="audit" onclick="openDfirView('audit')">Audit</button>
+  </div>
+
+  <div class="seg-control vuln-context workspace-hidden" id="vulnContextNav" role="group" aria-label="Vulnerability Management sections">
+    <button class="seg vuln-link active" type="button" data-vuln-view="exec">Executive</button>
+    <button class="seg vuln-link" type="button" data-vuln-view="findings">Findings</button>
+    <button class="seg vuln-link" type="button" data-vuln-view="patch">Microsoft Patch Cadence</button>
+    <button class="seg vuln-link" type="button" data-vuln-view="linux">Linux FP Review</button>
+  </div>
+
+  <main id="main" tabindex="-1">
+    <div class="controls" role="group" aria-label="Collection controls">
+      <div class="field">
+        <label for="edrSelect">Endpoint source</label>
+        <div class="seg-control" id="edrSelect" role="group" aria-label="Endpoint source">
+          <button id="csBtn" class="seg active" type="button">CrowdStrike</button>
+          <button id="s1Btn" class="seg" type="button">SentinelOne</button>
+        </div>
+      </div>
+      
+      <div class="field field-grow">
+        <label for="hostSearch">Endpoint filter</label>
+        <input class="text-input" id="hostSearch" type="search" placeholder="Search hostname, IP, device ID…">
+      </div>
+      
+    </div>
+
+    <div id="s1Notice" class="notice hidden"><b>SentinelOne execution:</b> approved Remote Script Library collectors are used for one-time evidence collection, with Fetch Files used for retrieval.</div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <section class="kpis" aria-label="Collection summary">
+      <article class="kpi kpi-primary"><div class="k-label">Platform connections</div><div class="k-num" id="summaryEdr">2 / 2</div><div class="k-foot">CrowdStrike + SentinelOne</div></article>
+      <article class="kpi"><div class="k-label">Selected endpoints</div><div class="k-num" id="summaryHosts">0</div><div class="k-foot">Ready for evidence collection</div></article>
+      <article class="kpi"><div class="k-label">Evidence jobs</div><div class="k-num" id="summaryJobs">0</div><div class="k-foot" id="summaryJobsSub">No jobs queued</div></article>
+      <article class="kpi"><div class="k-label">Evidence protection</div><div class="k-num">AES-GCM</div><div class="k-foot">Encrypted at rest</div></article>
+      <article class="kpi kpi-signal"><div class="k-label">Evidence workflow</div><div class="k-num small">Select → Collect → Verify</div><div class="k-foot">Evidence returns to this collector</div></article>
+    </section>
+
+    <section class="section console-view" data-view-panel="console">
+      <div class="section-head"><div><span class="section-kicker">Workflow</span><h2>Create evidence collection</h2></div><div class="section-count" id="count">0 selected</div></div>
+      <div class="workflow-strip" aria-label="Collection workflow">
+        <div class="workflow-step active" data-workflow-step="endpoints"><span>1</span><b>Endpoints</b><small>Select targets</small></div>
+        <div class="workflow-line"></div>
+        <div class="workflow-step" data-workflow-step="profile"><span>2</span><b>Profile</b><small>Choose artifacts</small></div>
+        <div class="workflow-line"></div>
+        <div class="workflow-step" data-workflow-step="deploy"><span>3</span><b>Deploy & collect</b><small>Run remotely</small></div>
+        <div class="workflow-line"></div>
+        <div class="workflow-step" data-workflow-step="retrieve"><span>4</span><b>Retrieve evidence</b><small>Verify & download</small></div>
+      </div>
+
+      <div class="content-grid">
+        <article class="panel">
+          <div class="panel-head"><div><h3>Select endpoints</h3><p>Inventory comes from the active Endpoint source.</p></div><div class="panel-actions"><button class="btn btn-secondary" id="resetPushed" type="button">Reset pushed</button><button class="btn btn-secondary" id="refreshInventory" type="button">Refresh inventory</button></div></div>
+          <div class="panel-body">
+            <div class="endpoint-tabs" role="tablist" aria-label="Endpoint view">
+              <button class="endpoint-tab" id="allTab" role="tab" aria-selected="true" type="button">All <span id="allCount">0</span></button>
+              <button class="endpoint-tab" id="containedTab" role="tab" aria-selected="false" type="button">Network contained <span id="containedCount">0</span></button>
+            </div><div class="endpoint-actions">
+              <div class="endpoint-selection-actions">
+                <button class="btn btn-secondary" id="selectAll" type="button">Select all online</button>
+                <button class="btn btn-secondary" id="clearAll" type="button">Clear</button>
+              </div>
+              <label class="wait-control"><input id="waitForOffline" type="checkbox"> Wait for offline endpoints</label>
+            </div>
+            <div id="hosts" class="host-table"><div class="state-msg">Loading endpoints…</div></div>
+            <div id="selectedText" class="selection-summary">No endpoints selected.</div><div class="wait-hint">When enabled, offline endpoints can be queued and the server polls the selected EDR every 5 minutes until the endpoint is ready.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><h3>Collection profile</h3><p>Predefined artifact sets keep collections predictable.</p></div></div>
+          <div class="panel-body">
+            <div id="profiles" class="profile-grid">
+              <button class="profile selected" data-profile="triage" type="button"><span class="profile-kicker">FAST</span><strong>Endpoint Triage</strong><span>Fast cross-platform evidence collection for initial triage.</span><em>2–5 min</em></button>
+              <button class="profile" data-profile="core_dfir" type="button"><span class="profile-kicker">CORE</span><strong>Core DFIR</strong><span>System, execution, authentication, and persistence evidence across supported operating systems.</span><em>5–15 min</em></button>
+              <button class="profile" data-profile="browser" type="button"><span class="profile-kicker">BROWSER</span><strong>Browser</strong><span>Browser artifacts and related evidence where supported.</span><em>15–30 min</em></button>
+              <button class="profile" data-profile="persistence" type="button"><span class="profile-kicker">PERSIST</span><strong>Persistence</strong><span>Startup and persistence locations by operating system.</span><em>2–10 min</em></button>
+            </div>
+            <div id="collectorStatus" class="collector-status" aria-live="polite">
+              <div class="collector-status-main"><span id="collectorStatusDot" class="collector-status-dot"></span><div id="collectorStatusText" class="collector-status-text"><strong>Velociraptor</strong> · Checking collector availability…</div></div>
+              <span class="collector-status-text">Manage Velociraptor in Settings</span>
+            </div>
+            <div class="dispatch-panel"><div><strong>Ready to collect?</strong><span>Deploy the selected bundle, run the chosen profile, retrieve the evidence, and verify the archive.</span></div><button id="run" class="btn btn-primary btn-large" type="button" disabled aria-disabled="true">Collect Evidence</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section console-view" data-view-panel="console">
+      <div class="section-head"><div><span class="section-kicker">Activity</span><h2>Recent collection jobs</h2></div><div class="section-count" id="jobSummary"></div></div>
+      <div id="jobs" class="job-list"><div class="state-msg">No collection jobs yet.</div></div>
+    </section>
+
+    <section class="section hidden asset-coverage-workspace" data-view-panel="asset-coverage">
+  <div class="asset-coverage-header">
+    <div>
+      <span class="section-kicker">Security Asset Visibility</span>
+      <h2>Asset Coverage</h2>
+      <p class="section-desc">Compare endpoint visibility across CrowdStrike, SentinelOne, and Tenable using deduplicated host records.</p>
+    </div>
+    <div class="section-actions">
+      <span class="section-count" id="coverageSyncStatus">Sync status: checking</span>
+      <button class="btn btn-secondary" id="refreshAssetCoverage" type="button">Sync assets</button>
+      <button class="btn btn-secondary" id="exportAssetCoverage" type="button">Export CSV</button>
+    </div>
+  </div>
+  <div class="kpis coverage-kpis" aria-label="Asset coverage summary">
+    <article class="kpi kpi-primary"><div class="k-label">Deduplicated assets</div><div class="k-num" id="coverageTotal">0</div><div class="k-foot">Unique hosts across all sources</div></article>
+    <article class="kpi"><div class="k-label">CrowdStrike</div><div class="k-num" id="coverageCs">0</div><div class="k-foot">Assets represented</div></article>
+    <article class="kpi"><div class="k-label">SentinelOne</div><div class="k-num" id="coverageS1">0</div><div class="k-foot">Assets represented</div></article>
+    <article class="kpi"><div class="k-label">Tenable</div><div class="k-num" id="coverageTen">0</div><div class="k-foot">Assets represented</div></article>
+  </div>
+  <div class="panel coverage-panel coverage-panel-full">
+    <div class="panel-head"><div><h3>Host coverage</h3><p>Use the filter to find assets missing from a specific security platform.</p></div></div>
+    <div class="panel-body">
+      <div class="coverage-controls">
+        <input class="text-input field-grow" id="coverageSearch" type="search" placeholder="Search hostname, IP, or alias…">
+        <select class="select-input" id="coverageMissing"><option value="all">All assets</option><option value="crowdstrike">Not in CrowdStrike</option><option value="sentinelone">Not in SentinelOne</option><option value="tenable">Not in Tenable</option><option value="any">Missing from at least one</option><option value="none">Present in all three</option></select>
+      </div>
+      <div id="coverageSourceNotice" class="notice hidden"></div>
+      <div class="coverage-table-wrap"><table class="coverage-table"><thead><tr><th>Host</th><th>IP</th><th>CrowdStrike</th><th>SentinelOne</th><th>Tenable</th><th>Match</th></tr></thead><tbody id="coverageTable"><tr><td colspan="6" class="state-msg">Loading assets…</td></tr></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+    <section class="section hidden" data-view-panel="jobs">
+      <div class="section-head"><div><span class="section-kicker">Queue</span><h2>Jobs</h2></div></div>
+      <div class="panel"><div class="panel-body"><div id="jobsPage" class="job-list"><div class="state-msg">Loading…</div></div></div></div>
+    </section>
+
+    <section class="section hidden" data-view-panel="audit">
+      <div class="section-head"><div><span class="section-kicker">Traceability</span><h2>Audit log</h2></div></div>
+      <div class="panel"><div class="panel-body"><div id="auditPage" class="audit-table"><div class="state-msg">Loading…</div></div></div></div>
+    </section>
+
+    <section class="section hidden settings-workspace" data-view-panel="settings">
+  <div class="section-head"><div><span class="section-kicker">Configuration</span><h2>Settings</h2><p class="section-desc">Collector configuration and web application administration.</p></div></div>
+  <div class="settings-sections">
+    <section class="settings-section">
+      <div class="settings-section-head"><div><span class="section-kicker">Collector</span><h3>Collector configuration</h3><p>Server-side acquisition, collection execution, and evidence handling.</p></div></div>
+      <div class="settings-grid">
+        <article class="panel"><div class="panel-head"><div><h3>Velociraptor</h3><p>Server-managed collectors for supported operating systems.</p></div></div><div class="panel-body"><div class="setting-row"><span>Server</span><b>Configured by server</b></div><div class="setting-row"><span>Version</span><b id="velociraptorVersionSetting">Configured by server</b></div><div class="setting-row"><span>Windows collectors</span><b id="velociraptorWindowsSetting">Checking</b></div><div class="setting-row"><span>Linux collectors</span><b id="velociraptorLinuxSetting">Checking</b></div><div class="setting-row"><span>macOS collectors</span><b id="velociraptorMacSetting">Checking</b></div><div class="setting-row"><span>Offline endpoint polling</span><b>Every 5 minutes</b></div><div class="setting-row"><span>Maximum wait</span><b>24 hours</b></div></div></article>
+        <article class="panel"><div class="panel-head"><div><h3>Tenable Asset Coverage</h3><p>Read-only asset inventory source.</p></div></div><div class="panel-body"><div class="setting-row"><span>API status</span><b id="tenableSettingStatus">Configured by server</b></div><div class="setting-row"><span>Endpoint</span><code>cloud.tenable.com/assets</code></div><div class="setting-row"><span>API keys</span><b>Server-side only</b></div></div></article>
+        <article class="panel"><div class="panel-head"><div><h3>Evidence handling</h3><p>Local evidence repository behavior.</p></div></div><div class="panel-body"><div class="setting-row"><span>Encrypted at rest</span><b class="good-text">Enabled</b></div><div class="setting-row"><span>Retention</span><b id="retentionSetting">Configured by server</b></div></div></article>
+      </div>
+    </section>
+    <section class="settings-section">
+      <div class="settings-section-head"><div><span class="section-kicker">Web Application</span><h3>Application administration</h3><p>Accounts, workspace permissions, and presentation settings.</p></div></div>
+      <div class="settings-grid">
+        <article class="panel"><div class="panel-head"><div><h3>User access</h3><p>Administrators can add users and assign workspace permissions.</p></div></div><div class="panel-body"><div class="admin-user-table-head"><span>User</span><span>Role / Identity</span><span>Workspace permissions</span><span>Status</span><span></span></div><div id="adminUserTable" class="admin-user-table"></div><form id="adminUserForm" class="admin-form"><h4 id="adminFormTitle">Add application user</h4><div class="admin-form-grid"><label>Username<input id="adminUsername" class="text-input" required></label><label>Password<input id="adminPassword" class="text-input" type="password" placeholder="12+ characters"></label><label>Cloudflare identity<input id="adminIdentityEmail" class="text-input" type="email" placeholder="user@usc.edu"></label><label>Role<select id="adminRole" class="select-input"><option value="operator">Operator</option><option value="admin">Administrator</option></select></label></div><div class="admin-permission-checks"><span class="lab">Workspace permissions</span><label><input id="perm_dfir" type="checkbox"> DFIR Evidence Collection</label><label><input id="perm_assets" type="checkbox"> Asset Coverage</label><label><input id="perm_vuln" type="checkbox"> Vulnerability Management</label></div><label class="chk"><input id="adminEnabled" type="checkbox" checked><span>Account enabled</span></label><div class="admin-actions"><button class="btn btn-primary" type="submit">Save user</button><button class="btn btn-secondary" id="adminCancelEdit" type="button">Cancel</button></div></form></div></article>
+        <article class="panel"><div class="panel-head"><div><h3>Theme</h3><p>Choose how the console follows the browser.</p></div></div><div class="panel-body theme-buttons"><button data-theme="auto" type="button">Auto · browser</button><button data-theme="light" type="button">Light</button><button data-theme="dark" type="button">Dark</button></div></article>
+      </div>
+    </section>
+  </div>
+</section><section class="section hidden vuln-workspace" data-view-panel="vulnerability">
+      <div class="vuln-header">
+        <div>
+          <span class="section-kicker">Security Exposure</span>
+          <h2 id="vulnPageTitle">Vulnerability Management</h2>
+          <p class="section-desc">Tenable findings prioritized by VPR, CVSSv3, severity, age, and host risk.</p>
+        </div>
+        <div class="section-actions">
+          <span class="section-count" id="vulnSourceStatus">Source: Tenable API</span>
+          <select class="select-input" id="vulnHistory"><option value="">All open</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
+          <button class="btn btn-secondary" id="refreshVuln" type="button">Refresh from Tenable</button>
+        </div>
+      </div>
+
+      <div class="vuln-controls panel">
+        <div class="panel-body vuln-control-grid">
+          <div class="field">
+            <label for="vulnWeight">VPR / CVSS weighting</label>
+            <input id="vulnWeight" type="range" min="0" max="100" value="60" step="5">
+            <div class="weight-readout" id="vulnWeightReadout">VPR 0.60 · CVSS 0.40</div>
+          </div>
+          <div class="field">
+            <label for="vulnNewDays">New within (days)</label>
+            <input class="text-input" id="vulnNewDays" type="number" value="3" min="1" max="90">
+          </div>
+          <div class="field">
+            <label for="vulnSeverity">Severity</label>
+            <select class="select-input" id="vulnSeverity"><option value="all">All severities</option><option value="critical">Critical</option><option value="critical,high">Critical + High</option><option value="critical,high,medium">Critical + High + Medium</option></select>
+          </div>
+          <label class="chk vuln-check"><input type="checkbox" id="vulnNewOnly"><span>New findings only</span></label>
+          <label class="chk vuln-check"><input type="checkbox" id="vulnSeparateMs" checked><span>Separate Microsoft updates</span></label>
+        </div>
+      </div>
+
+      <section class="vuln-page" data-vuln-panel="exec">
+        <div class="kpis vuln-kpis" id="vulnKpis"></div>
+        <div class="vuln-chart-grid">
+          <article class="panel"><div class="panel-head"><div><h3>New & Critical</h3><p>Highest-priority findings in the selected window.</p></div><span class="section-count" id="vulnNewCritCount"></span></div><div class="panel-body" id="vulnNewCrit"></div></article>
+          <article class="panel"><div class="panel-head"><div><h3>Top Hosts by Risk</h3><p>Aggregate weighted finding score per host.</p></div></div><div class="panel-body" id="vulnHostRisk"></div></article>
+        </div>
+        <article class="panel"><div class="panel-head"><div><h3>Severity Distribution</h3><p>Open findings by severity.</p></div></div><div class="panel-body"><div class="vuln-bars" id="vulnSeverityChart"></div></div></article>
+        <article class="panel"><div class="panel-head"><div><h3>Age vs Criticality</h3><p>Where criticality and age intersect, risk accumulates.</p></div></div><div class="panel-body"><div class="vuln-matrix" id="vulnAgeMatrix"></div></div></article>
+      </section>
+
+      <section class="vuln-page hidden" data-vuln-panel="findings">
+        <article class="panel"><div class="panel-head"><div><h3>Host Vulnerabilities by Priority</h3><p>Filter, sort, and inspect current Tenable findings.</p></div><span class="section-count" id="vulnFindingsCount"></span></div><div class="panel-body">
+          <div class="coverage-controls"><input class="text-input field-grow" id="vulnSearch" type="search" placeholder="Host, vulnerability, CVE, family…"><select class="select-input" id="vulnOs"><option value="all">All operating systems</option><option value="windows">Windows</option><option value="linux">Linux</option><option value="macos">macOS</option><option value="other">Other</option></select></div>
+          <div class="coverage-table-wrap"><table class="coverage-table vuln-table"><thead><tr><th>Vulnerability</th><th>Host</th><th>Severity</th><th>VPR</th><th>CVSSv3</th><th>First Seen</th><th>Last Seen</th><th>Status</th></tr></thead><tbody id="vulnFindingsTable"><tr><td colspan="8" class="state-msg">No vulnerability data loaded.</td></tr></tbody></table></div>
+        </div></article>
+      </section>
+
+      <section class="vuln-page hidden" data-vuln-panel="patch">
+        <article class="panel"><div class="panel-head"><div><h3>Microsoft Patch Cadence</h3><p>Track Microsoft monthly/security update findings separately from general exposure.</p></div></div><div class="panel-body" id="vulnPatchList"></div></article>
+      </section>
+
+      <section class="vuln-page hidden" data-vuln-panel="linux">
+        <article class="panel"><div class="panel-head"><div><h3>Linux False Positive Review</h3><p>Automatically compare Linux findings with vendor security data and show the resulting status.</p></div><select class="select-input" id="vulnLinuxDistro"><option value="all">All Linux</option><option value="debian">Debian</option><option value="ubuntu">Ubuntu</option><option value="rhel">Red Hat Enterprise Linux</option><option value="almalinux">AlmaLinux</option><option value="oraclelinux">Oracle Linux</option></select></div><div class="panel-body" id="vulnLinuxList"></div></article>
+      </section>
+    </section>
+</main>
+
+  <footer class="foot"><b id="pageFooterBrand">USC Office of Cybersecurity · DFIR Evidence Collection Console</b> · Cloudflare Access provides the authentication boundary · Evidence is encrypted on the collector.</footer>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
