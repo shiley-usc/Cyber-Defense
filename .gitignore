@@ -1,0 +1,16 @@
+# Local secrets
+.env
+# Runtime data
+evidence-collector.db
+*.db-wal
+*.db-shm
+uploads/
+velociraptor/datastore/*
+velociraptor/collectors/*
+!velociraptor/collectors/.gitkeep
+# Python
+__pycache__/
+*.pyc
+# Test artifacts
+ui-smoke.db*
+pytest-cache/
