@@ -1,0 +1,42 @@
+services:
+  evidence-collector:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./evidence-collector.db:/app/evidence-collector.db
+    read_only: false
+
+  velociraptor-server:
+    image: ghcr.io/velocidex/velociraptor-server:${VELOCIRAPTOR_VERSION:-0.77.1}
+    restart: unless-stopped
+    environment:
+      VELOCIRAPTOR_HOSTNAME: ${VELOCIRAPTOR_HOSTNAME:-127.0.0.1}
+      VELOCIRAPTOR_FRONTEND_PORT: ${VELOCIRAPTOR_FRONTEND_PORT:-8000}
+      VELOCIRAPTOR_GUI_PORT: ${VELOCIRAPTOR_GUI_PORT:-8889}
+      VELOCIRAPTOR_DATASTORE_PATH: /datastore
+      VELOCIRAPTOR_CONFIG_PATH: /etc/server.config.yaml
+      VELOCIRAPTOR_INITIAL_ADMIN_PASSWORD: ${VELOCIRAPTOR_INITIAL_ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:${VELOCIRAPTOR_GUI_HOST_PORT:-8889}:8889"
+      - "127.0.0.1:${VELOCIRAPTOR_FRONTEND_HOST_PORT:-8001}:8000"
+    volumes:
+      - ./velociraptor/etc:/etc
+      - ./velociraptor/datastore:/datastore
+      - ./velociraptor/collectors:/collectors
+
+  velociraptor-builder:
+    image: ghcr.io/velocidex/velociraptor-server:${VELOCIRAPTOR_VERSION:-0.77.1}
+    profiles: ["build"]
+    entrypoint: ["velociraptor"]
+    environment:
+      VELOCIRAPTOR_DATASTORE_PATH: /datastore
+    volumes:
+      - ./velociraptor/specs:/specs:ro
+      - ./velociraptor/collectors:/collectors
+      - ./velociraptor/datastore:/datastore
+      - ./velociraptor/etc:/etc

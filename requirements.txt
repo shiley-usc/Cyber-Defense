@@ -1,0 +1,10 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+python-multipart==0.0.20
+falconpy==1.5.7
+cryptography==45.0.6
+pydantic==2.11.7
+requests==2.32.4
+PyJWT==2.10.1
+
+py7zr==1.1.3
